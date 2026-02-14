@@ -3,36 +3,21 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
-  <title>Para Ti ✨</title>
+  <title>Animación Bonita ✨</title>
   <style>
     html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
     canvas{position:fixed;inset:0;width:100%;height:100%}
-    .ui{
-      position:fixed;left:12px;right:12px;top:12px;
-      display:flex;justify-content:space-between;gap:10px;pointer-events:none
+    .top{
+      position:fixed;left:12px;right:12px;top:12px;display:flex;justify-content:space-between;gap:10px;pointer-events:none
     }
     .pill{
-      pointer-events:auto;
-      background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);
+      pointer-events:auto;background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);
       backdrop-filter:blur(10px);color:#fff;padding:10px 12px;border-radius:999px;
       display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);
       font-size:13px
     }
     button{appearance:none;border:0;cursor:pointer;background:rgba(255,255,255,.10);color:#fff;padding:10px 12px;border-radius:12px}
     button:active{transform:scale(.98)}
-    .centerText{
-      position:fixed;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none;padding:24px
-    }
-    .centerText h1{
-      margin:0;
-      font-size:clamp(28px,4vw,56px);
-      text-shadow:0 0 26px rgba(255,255,255,.14);
-    }
-    .centerText p{
-      margin:10px 0 0;
-      font-size:clamp(15px,2vw,22px);
-      opacity:.9
-    }
     .hint{
       position:fixed;left:50%;bottom:12px;transform:translateX(-50%);
       color:rgba(255,255,255,.72);font-size:12px;padding:8px 10px;
@@ -44,53 +29,49 @@
 <body>
   <canvas id="c"></canvas>
 
-  <div class="ui">
-    <div class="pill"><strong id="t1">Te amo</strong> <span style="opacity:.75" id="t2">— solo quería recordártelo</span></div>
+  <div class="top">
+    <div class="pill"><strong id="label">Te amo 💖</strong> <span style="opacity:.75">— toca para magia</span></div>
     <div class="pill">
-      <button id="btnPause">Pausar</button>
-      <button id="btnMore">Más frases</button>
+      <button id="btn">Cambiar frase</button>
+      <button id="pause">Pausar</button>
     </div>
   </div>
 
-  <div class="centerText">
-    <div>
-      <h1 id="main">Te amo mi amor 💖</h1>
-      <p id="sub">Mira el cielo… está lleno de “nosotros”.</p>
-    </div>
-  </div>
-
-  <div class="hint">Toca la pantalla para “explosión” ✨ • Arrastra para mover el viento</div>
+  <div class="hint">Toca para ondas ✨ • Arrastra para “viento” • Rueda/Pellizca para zoom</div>
 
 <script>
 (() => {
-  const canvas = document.getElementById("c");
-  const ctx = canvas.getContext("2d");
+  const c = document.getElementById("c");
+  const x = c.getContext("2d");
 
   const CFG = {
-    main: "#ff4d8d",
-    accent: "#ffffff",
-    starCount: 900,
-    cometCount: 18,
-    floatCount: 24,
-    trailLen: 18,
-    windStrength: 0.8,
-    phrasesA: ["te amo mi amor","mi cielo","mi vida","eres mi todo","me encantas","mi niña hermosa","contigo siempre","te elijo hoy"],
-    phrasesB: ["gracias por existir","eres mi paz","mi lugar favorito","quédate","mi corazoncito","mi suerte","te pienso","mi universo"],
+    main:"#ff4d8d",
+    glow:"#ffffff",
+    stars: 1200,
+    dust: 260,
+    zoomMin: 0.6,
+    zoomMax: 2.0,
   };
 
-  let W=0,H=0,DPR=1;
+  const phrases = [
+    "te amo mi amor", "mi cielo", "mi vida", "eres mi todo",
+    "contigo siempre", "mi corazoncito", "me haces feliz", "te elijo hoy"
+  ];
+
+  let W=0,H=0,DPR=1, t=0, paused=false;
+  let zoom=1.0, windX=0, windY=0;
+
   function resize(){
-    DPR = Math.max(1, Math.min(2, devicePixelRatio || 1));
+    DPR = Math.max(1, Math.min(2, devicePixelRatio||1));
     W = innerWidth; H = innerHeight;
-    canvas.width = Math.floor(W*DPR);
-    canvas.height = Math.floor(H*DPR);
-    ctx.setTransform(DPR,0,0,DPR,0,0);
+    c.width = Math.floor(W*DPR);
+    c.height = Math.floor(H*DPR);
+    x.setTransform(DPR,0,0,DPR,0,0);
   }
   addEventListener("resize", resize); resize();
 
-  // Helpers
   const rand = (a,b)=> a + Math.random()*(b-a);
-  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const clamp = (v,a,b)=> Math.max(a, Math.min(b,v));
   function rgba(hex,a){
     const h=hex.replace("#","");
     const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
@@ -98,252 +79,234 @@
   }
 
   // Stars
-  const stars = Array.from({length: CFG.starCount}, ()=>({
-    x: Math.random()*W,
-    y: Math.random()*H,
-    r: rand(0.2,1.6),
-    a: rand(0.25,0.95),
+  const stars = Array.from({length: CFG.stars}, ()=>({
+    x: Math.random()*W, y: Math.random()*H,
+    r: rand(0.25,1.8),
+    a: rand(0.2,0.95),
     tw: rand(0,10),
-    sp: rand(0.15,0.6),
+    sp: rand(0.2,0.8)
   }));
 
-  // Comets (particles with trails)
-  const comets = Array.from({length: CFG.cometCount}, ()=>newComet());
+  // Dust particles (parallax)
+  const dust = Array.from({length: CFG.dust}, ()=>({
+    x: rand(-W*0.2, W*1.2),
+    y: rand(-H*0.2, H*1.2),
+    vx: rand(-0.25,0.25),
+    vy: rand(-0.25,0.25),
+    s: rand(0.6, 2.2),
+    a: rand(0.08, 0.22),
+    z: rand(0.4, 1.4)
+  }));
 
-  function newComet(x=W+rand(0,400), y=rand(-200,H+200)){
-    const speed = rand(1.6, 3.8);
-    return {
-      x, y,
-      vx: -speed*rand(0.7,1.1),
-      vy: speed*rand(-0.25,0.25),
-      life: rand(120, 260),
-      max: 0,
-      trail: []
-    };
-  }
-
-  // Floating phrases
-  const floaters = [];
-  function makeFloater(text){
-    return {
-      text,
-      x: rand(0,W),
-      y: rand(0,H),
-      z: rand(0.4, 1.25),     // scale
-      vy: -rand(0.18,0.55),
-      drift: rand(0.08,0.25),
-      a: rand(0.25,0.85)
-    };
-  }
-  function refillFloaters(){
-    floaters.length = 0;
-    for(let i=0;i<CFG.floatCount;i++){
-      const list = (i%2===0)?CFG.phrasesA:CFG.phrasesB;
-      floaters.push(makeFloater(list[i % list.length]));
+  // Ripples + sparkles on tap
+  const ripples = [];
+  const spark = [];
+  function burst(px,py){
+    ripples.push({x:px,y:py,r:0,life:1});
+    for(let i=0;i<26;i++){
+      const a = rand(0,Math.PI*2);
+      const spd = rand(1.6, 4.8);
+      spark.push({x:px,y:py,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,life:rand(18,40)});
     }
   }
-  refillFloaters();
 
-  // Interaction: wind + sparkle bursts
-  let windX = 0, windY = 0;
+  // Interaction: pointer drag => wind
   let dragging=false, lastX=0,lastY=0;
-  canvas.addEventListener("pointerdown",(e)=>{dragging=true; lastX=e.clientX; lastY=e.clientY; canvas.setPointerCapture(e.pointerId);});
-  canvas.addEventListener("pointermove",(e)=>{
+  c.addEventListener("pointerdown",(e)=>{dragging=true; lastX=e.clientX; lastY=e.clientY; c.setPointerCapture(e.pointerId);});
+  c.addEventListener("pointermove",(e)=>{
     if(!dragging) return;
     const dx=e.clientX-lastX, dy=e.clientY-lastY;
     lastX=e.clientX; lastY=e.clientY;
-    windX = clamp(windX + dx*0.02, -12, 12);
-    windY = clamp(windY + dy*0.02, -6, 6);
+    windX = clamp(windX + dx*0.03, -18, 18);
+    windY = clamp(windY + dy*0.03, -10, 10);
   });
-  canvas.addEventListener("pointerup",()=>dragging=false);
-  canvas.addEventListener("pointercancel",()=>dragging=false);
+  c.addEventListener("pointerup",()=>dragging=false);
+  c.addEventListener("pointercancel",()=>dragging=false);
 
-  const sparks = [];
-  function burst(x,y){
-    for(let i=0;i<30;i++){
-      const a = rand(0,Math.PI*2);
-      const s = rand(1.2, 4.6);
-      sparks.push({
-        x,y,
-        vx: Math.cos(a)*s,
-        vy: Math.sin(a)*s,
-        life: rand(22, 45),
-        c: Math.random()<0.6?CFG.main:"#ffffff"
-      });
+  c.addEventListener("click",(e)=>burst(e.clientX,e.clientY));
+
+  addEventListener("wheel",(e)=>{
+    const z = Math.exp(-e.deltaY*0.0012);
+    zoom = clamp(zoom*z, CFG.zoomMin, CFG.zoomMax);
+  }, {passive:true});
+
+  let pinch0=null;
+  c.addEventListener("touchstart",(e)=>{
+    if(e.touches.length===2){
+      pinch0 = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
     }
-  }
-  canvas.addEventListener("click",(e)=>burst(e.clientX,e.clientY));
-
-  // Buttons
-  let paused=false;
-  document.getElementById("btnPause").onclick=()=>{
-    paused=!paused;
-    document.getElementById("btnPause").textContent=paused?"Reanudar":"Pausar";
-  };
-  let toggle=false;
-  document.getElementById("btnMore").onclick=()=>{
-    toggle=!toggle;
-    const main=document.getElementById("main");
-    const sub=document.getElementById("sub");
-    if(toggle){
-      main.textContent="Eres mi lugar favorito ✨";
-      sub.textContent="Y mi razón para sonreír.";
-      // recargar con otras frases
-      CFG.phrasesA = ["mi amor","te extraño bonito","me haces feliz","qué lindo es quererte","mi cielo","me encantas","mi vida","eres tú"];
-      CFG.phrasesB = ["siempre contigo","te pienso mucho","mi paz","mi alegría","mi universo","mi suerte","mi corazoncito","mi todo"];
-      refillFloaters();
-    } else {
-      main.textContent="Te amo mi amor 💖";
-      sub.textContent="Mira el cielo… está lleno de “nosotros”.";
-      CFG.phrasesA = ["te amo mi amor","mi cielo","mi vida","eres mi todo","me encantas","mi niña hermosa","contigo siempre","te elijo hoy"];
-      CFG.phrasesB = ["gracias por existir","eres mi paz","mi lugar favorito","quédate","mi corazoncito","mi suerte","te pienso","mi universo"];
-      refillFloaters();
+  }, {passive:true});
+  c.addEventListener("touchmove",(e)=>{
+    if(e.touches.length===2 && pinch0){
+      const d = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const z = d / pinch0;
+      pinch0 = d;
+      zoom = clamp(zoom*z, CFG.zoomMin, CFG.zoomMax);
     }
+  }, {passive:true});
+  c.addEventListener("touchend",()=>pinch0=null, {passive:true});
+
+  // Phrase overlay (animated)
+  let phraseIndex = 0;
+  let phraseAlpha = 1;
+  let phraseTimer = 0;
+
+  const label = document.getElementById("label");
+  document.getElementById("btn").onclick = () => {
+    phraseIndex = (phraseIndex + 1) % phrases.length;
+    label.textContent = phrases[phraseIndex];
+    phraseAlpha = 1;
+    phraseTimer = 0;
   };
 
-  // Heart in center (pulse)
-  function drawHeart(cx,cy,s){
-    ctx.beginPath();
-    ctx.moveTo(cx, cy + s*0.30);
-    ctx.bezierCurveTo(cx - s*0.60, cy - s*0.25, cx - s*0.95, cy + s*0.40, cx, cy + s);
-    ctx.bezierCurveTo(cx + s*0.95, cy + s*0.40, cx + s*0.60, cy - s*0.25, cx, cy + s*0.30);
-    ctx.closePath();
-    ctx.fill();
+  document.getElementById("pause").onclick = () => {
+    paused = !paused;
+    document.getElementById("pause").textContent = paused ? "Reanudar" : "Pausar";
+  };
+
+  // Heart (with fake 3D shading)
+  function heartPath(cx,cy,s){
+    x.beginPath();
+    x.moveTo(cx, cy + s*0.28);
+    x.bezierCurveTo(cx - s*0.62, cy - s*0.28, cx - s*0.98, cy + s*0.42, cx, cy + s);
+    x.bezierCurveTo(cx + s*0.98, cy + s*0.42, cx + s*0.62, cy - s*0.28, cx, cy + s*0.28);
+    x.closePath();
   }
 
-  // Loop
-  let t=0;
   function frame(){
     requestAnimationFrame(frame);
     if(!paused) t += 1/60;
 
-    // Background
-    ctx.fillStyle="#000";
-    ctx.fillRect(0,0,W,H);
+    // Background fill
+    x.fillStyle="#000";
+    x.fillRect(0,0,W,H);
 
-    // Soft nebula
-    const g = ctx.createRadialGradient(W*0.55, H*0.55, 20, W*0.55, H*0.55, Math.max(W,H)*0.7);
-    g.addColorStop(0, rgba(CFG.main, 0.10));
+    // Aurora gradient (animated)
+    const ax = W*(0.45 + 0.08*Math.sin(t*0.20));
+    const ay = H*(0.55 + 0.08*Math.cos(t*0.18));
+    const g = x.createRadialGradient(ax,ay, 10, ax,ay, Math.max(W,H)*0.75);
+    g.addColorStop(0, rgba(CFG.main, 0.14));
+    g.addColorStop(0.55, rgba(CFG.main, 0.06));
     g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle=g;
-    ctx.fillRect(0,0,W,H);
+    x.fillStyle=g; x.fillRect(0,0,W,H);
 
-    // Stars
+    // Stars twinkle
     for(const s of stars){
       const tw = 0.5 + 0.5*Math.sin(t*s.sp + s.tw);
-      ctx.globalAlpha = s.a*(0.65+0.35*tw);
-      ctx.fillStyle="#fff";
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, s.r*(0.7+0.6*tw), 0, Math.PI*2);
-      ctx.fill();
+      x.globalAlpha = s.a*(0.55+0.45*tw);
+      x.fillStyle="#fff";
+      x.beginPath();
+      x.arc(s.x, s.y, s.r*(0.7+0.7*tw), 0, Math.PI*2);
+      x.fill();
     }
-    ctx.globalAlpha=1;
+    x.globalAlpha=1;
 
-    // Comets
-    ctx.lineCap="round";
-    for(let i=0;i<comets.length;i++){
-      const c = comets[i];
+    // Dust drift (parallax with zoom & wind)
+    for(const p of dust){
       if(!paused){
-        c.max++;
-        c.life--;
-        // wind
-        c.vx += windX*0.002*CFG.windStrength;
-        c.vy += windY*0.002*CFG.windStrength;
-
-        c.x += c.vx;
-        c.y += c.vy;
-        c.trail.push({x:c.x, y:c.y});
-        if(c.trail.length>CFG.trailLen) c.trail.shift();
-      }
-
-      // draw trail
-      for(let k=1;k<c.trail.length;k++){
-        const p0=c.trail[k-1], p1=c.trail[k];
-        const a = k/c.trail.length;
-        ctx.strokeStyle = rgba(CFG.main, 0.20*a);
-        ctx.lineWidth = 2.2*a;
-        ctx.beginPath();
-        ctx.moveTo(p0.x,p0.y);
-        ctx.lineTo(p1.x,p1.y);
-        ctx.stroke();
-      }
-      // head
-      ctx.fillStyle = rgba("#ffffff", 0.9);
-      ctx.beginPath();
-      ctx.arc(c.x, c.y, 1.8, 0, Math.PI*2);
-      ctx.fill();
-
-      if(c.life<=0 || c.x<-500 || c.y<-500 || c.y>H+500){
-        comets[i]=newComet();
-      }
-    }
-
-    // Center heart + glow
-    const beat = 1 + 0.06*Math.sin(t*2.1) + 0.03*Math.sin(t*4.2);
-    const s = Math.min(W,H)*0.08*beat;
-    // glow
-    const gg = ctx.createRadialGradient(W/2,H/2, 0, W/2,H/2, s*5);
-    gg.addColorStop(0, rgba(CFG.main, 0.25));
-    gg.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle=gg;
-    ctx.fillRect(0,0,W,H);
-
-    ctx.fillStyle = CFG.main;
-    ctx.shadowColor = rgba(CFG.main, 0.55);
-    ctx.shadowBlur = 24;
-    drawHeart(W/2, H/2 - s*0.15, s);
-    ctx.shadowBlur = 0;
-
-    // Floating phrases (depth-ish)
-    for(const f of floaters){
-      if(!paused){
-        f.y += f.vy;
-        f.x += (Math.sin(t*f.drift) + windX*0.02) * 0.25;
-        if(f.y < -60) { f.y = H + 60; f.x = rand(0,W); }
-        if(f.x < -120) f.x = W+120;
-        if(f.x > W+120) f.x = -120;
-      }
-      const scale = f.z;
-      ctx.font = `${Math.round(14*scale)}px system-ui,-apple-system,Segoe UI,Roboto,Arial`;
-      ctx.textAlign="center";
-      ctx.textBaseline="middle";
-      ctx.globalAlpha = f.a;
-
-      // outline + fill
-      ctx.lineWidth = 3;
-      ctx.strokeStyle = rgba(CFG.main, 0.55);
-      ctx.fillStyle = "rgba(255,255,255,0.95)";
-      ctx.shadowColor = "rgba(255,255,255,0.28)";
-      ctx.shadowBlur = 10;
-      ctx.strokeText(f.text, f.x, f.y);
-      ctx.shadowBlur = 0;
-      ctx.fillText(f.text, f.x, f.y);
-
-      ctx.globalAlpha=1;
-    }
-
-    // Sparks
-    for(let i=sparks.length-1;i>=0;i--){
-      const p = sparks[i];
-      if(!paused){
-        p.life -= 1;
-        p.vx *= 0.97;
-        p.vy *= 0.97;
-        p.vy += 0.06; // gravity
+        p.vx += windX*0.0004*p.z;
+        p.vy += windY*0.0004*p.z;
         p.x += p.vx;
         p.y += p.vy;
-      }
-      const a = clamp(p.life/45, 0, 1);
-      ctx.globalAlpha = a;
-      ctx.fillStyle = rgba(p.c, 0.85*a);
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 2.0*a, 0, Math.PI*2);
-      ctx.fill();
-      if(p.life<=0) sparks.splice(i,1);
-    }
-    ctx.globalAlpha=1;
 
-    // Slowly relax wind
+        // wrap
+        if(p.x<-W*0.25) p.x=W*1.25;
+        if(p.x>W*1.25) p.x=-W*0.25;
+        if(p.y<-H*0.25) p.y=H*1.25;
+        if(p.y>H*1.25) p.y=-H*0.25;
+      }
+      const sz = p.s*(0.6+0.8*p.z)*zoom;
+      x.globalAlpha = p.a;
+      x.fillStyle = rgba(CFG.main, 0.9);
+      x.beginPath();
+      x.arc(p.x, p.y, sz, 0, Math.PI*2);
+      x.fill();
+    }
+    x.globalAlpha=1;
+
+    // Center heart pulse + rotate illusion
+    const beat = 1 + 0.07*Math.sin(t*2.2) + 0.03*Math.sin(t*4.4);
+    const base = Math.min(W,H)*0.085*zoom;
+    const s = base*beat;
+    const rot = Math.sin(t*0.9)*0.35 + windX*0.01; // fake rotate via gradient shift
+
+    // glow
+    const gg = x.createRadialGradient(W/2,H/2, 0, W/2,H/2, s*5.2);
+    gg.addColorStop(0, rgba(CFG.main, 0.22));
+    gg.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle=gg; x.fillRect(0,0,W,H);
+
+    // shading gradient for fake 3D
+    const hx = W/2 + rot*s*1.2, hy = H/2 - rot*s*0.6;
+    const hg = x.createRadialGradient(hx,hy, s*0.2, W/2,H/2, s*2.0);
+    hg.addColorStop(0, rgba("#ffffff", 0.35));
+    hg.addColorStop(0.3, rgba(CFG.main, 0.95));
+    hg.addColorStop(1, rgba("#5a0022", 0.95));
+
+    x.shadowColor = rgba(CFG.main, 0.55);
+    x.shadowBlur = 26;
+    x.fillStyle = hg;
+    heartPath(W/2, H/2 - s*0.12, s);
+    x.fill();
+    x.shadowBlur = 0;
+
+    // Ripples
+    for(let i=ripples.length-1;i>=0;i--){
+      const r = ripples[i];
+      if(!paused){
+        r.r += 6.5;
+        r.life -= 0.02;
+      }
+      const a = clamp(r.life, 0, 1);
+      x.globalAlpha = a;
+      x.strokeStyle = rgba(CFG.main, 0.55*a);
+      x.lineWidth = 2;
+      x.beginPath();
+      x.arc(r.x, r.y, r.r, 0, Math.PI*2);
+      x.stroke();
+      if(r.life<=0) ripples.splice(i,1);
+    }
+    x.globalAlpha = 1;
+
+    // Sparkles
+    for(let i=spark.length-1;i>=0;i--){
+      const p = spark[i];
+      if(!paused){
+        p.life -= 1;
+        p.vx *= 0.97; p.vy *= 0.97;
+        p.vy += 0.05;
+        p.x += p.vx; p.y += p.vy;
+      }
+      const a = clamp(p.life/40, 0, 1);
+      x.globalAlpha = a;
+      x.fillStyle = rgba(Math.random()<0.5?CFG.main:"#ffffff", 0.85*a);
+      x.beginPath();
+      x.arc(p.x, p.y, 2.0*a, 0, Math.PI*2);
+      x.fill();
+      if(p.life<=0) spark.splice(i,1);
+    }
+    x.globalAlpha = 1;
+
+    // Phrase fade in/out auto
+    phraseTimer += 1/60;
+    phraseAlpha = 0.35 + 0.65*(0.5+0.5*Math.sin(t*0.6));
+    x.globalAlpha = phraseAlpha;
+    x.font = `${Math.round(18*zoom)}px system-ui,-apple-system,Segoe UI,Roboto,Arial`;
+    x.textAlign="center"; x.textBaseline="middle";
+    x.lineWidth = 3;
+    x.strokeStyle = rgba(CFG.main, 0.55);
+    x.fillStyle = "rgba(255,255,255,0.95)";
+    x.strokeText(phrases[phraseIndex], W/2, H*0.78);
+    x.fillText(phrases[phraseIndex], W/2, H*0.78);
+    x.globalAlpha = 1;
+
+    // Relax wind
     windX *= 0.985;
     windY *= 0.985;
   }
