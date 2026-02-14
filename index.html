@@ -1,488 +1,354 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
-  <title>Sistema Solar de Corazones</title>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+  <title>Para Ti ✨</title>
   <style>
-    html, body { height:100%; margin:0; background:#000; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-    #app { position:fixed; inset:0; }
-    .ui {
-      position:fixed; left:12px; top:12px; right:12px;
-      display:flex; justify-content:space-between; gap:10px;
-      pointer-events:none;
+    html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    canvas{position:fixed;inset:0;width:100%;height:100%}
+    .ui{
+      position:fixed;left:12px;right:12px;top:12px;
+      display:flex;justify-content:space-between;gap:10px;pointer-events:none
     }
     .pill{
       pointer-events:auto;
-      background: rgba(0,0,0,.45);
-      border:1px solid rgba(255,255,255,.12);
-      backdrop-filter: blur(10px);
-      color:#fff; padding:10px 12px;
-      border-radius:999px;
-      display:flex; align-items:center; gap:10px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.35);
-      font-size:13px;
+      background:rgba(0,0,0,.45);border:1px solid rgba(255,255,255,.12);
+      backdrop-filter:blur(10px);color:#fff;padding:10px 12px;border-radius:999px;
+      display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);
+      font-size:13px
     }
-    .pill strong{font-weight:800}
-    button{
-      appearance:none; border:0; cursor:pointer;
-      background: rgba(255,255,255,.10);
-      color:#fff; padding:10px 12px; border-radius:12px;
+    button{appearance:none;border:0;cursor:pointer;background:rgba(255,255,255,.10);color:#fff;padding:10px 12px;border-radius:12px}
+    button:active{transform:scale(.98)}
+    .centerText{
+      position:fixed;inset:0;display:grid;place-items:center;text-align:center;pointer-events:none;padding:24px
     }
-    button:hover{background: rgba(255,255,255,.16);}
+    .centerText h1{
+      margin:0;
+      font-size:clamp(28px,4vw,56px);
+      text-shadow:0 0 26px rgba(255,255,255,.14);
+    }
+    .centerText p{
+      margin:10px 0 0;
+      font-size:clamp(15px,2vw,22px);
+      opacity:.9
+    }
     .hint{
-      position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
-      color:rgba(255,255,255,.72);
-      font-size:12px;
-      padding:8px 10px;
-      background: rgba(0,0,0,.35);
-      border:1px solid rgba(255,255,255,.10);
-      border-radius:999px;
-      backdrop-filter: blur(10px);
-      pointer-events:none;
-      text-align:center;
-      max-width: min(520px, calc(100% - 28px));
+      position:fixed;left:50%;bottom:12px;transform:translateX(-50%);
+      color:rgba(255,255,255,.72);font-size:12px;padding:8px 10px;
+      background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.10);border-radius:999px;
+      backdrop-filter:blur(10px);pointer-events:none;max-width:min(560px, calc(100% - 24px));text-align:center
     }
   </style>
 </head>
 <body>
-  <div id="app"></div>
+  <canvas id="c"></canvas>
 
   <div class="ui">
-    <div class="pill"><strong id="title">Te amo mi amor</strong> <span style="opacity:.75" id="sub">— sistema solar 💫</span></div>
+    <div class="pill"><strong id="t1">Te amo</strong> <span style="opacity:.75" id="t2">— solo quería recordártelo</span></div>
     <div class="pill">
       <button id="btnPause">Pausar</button>
-      <button id="btnReset">Reset cámara</button>
+      <button id="btnMore">Más frases</button>
     </div>
   </div>
 
-  <div class="hint">Arrastra para girar • Pellizca para zoom • Doble toque para reset (en móvil)</div>
+  <div class="centerText">
+    <div>
+      <h1 id="main">Te amo mi amor 💖</h1>
+      <p id="sub">Mira el cielo… está lleno de “nosotros”.</p>
+    </div>
+  </div>
 
-  <!-- Three.js desde CDN -->
-  <script type="module">
-    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
-    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+  <div class="hint">Toca la pantalla para “explosión” ✨ • Arrastra para mover el viento</div>
 
-    // --------- Ajustes rápidos ----------
-    const CONFIG = {
-      mainColor: 0xff4d8d,
-      heartColor: 0xff4d8d,
-      messageColor: 0xffffff,
+<script>
+(() => {
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
 
-      starCount: 2500,
-      starRadius: 140,
+  const CFG = {
+    main: "#ff4d8d",
+    accent: "#ffffff",
+    starCount: 900,
+    cometCount: 18,
+    floatCount: 24,
+    trailLen: 18,
+    windStrength: 0.8,
+    phrasesA: ["te amo mi amor","mi cielo","mi vida","eres mi todo","me encantas","mi niña hermosa","contigo siempre","te elijo hoy"],
+    phrasesB: ["gracias por existir","eres mi paz","mi lugar favorito","quédate","mi corazoncito","mi suerte","te pienso","mi universo"],
+  };
 
-      // “Sol”
-      sunSize: 3.2,
+  let W=0,H=0,DPR=1;
+  function resize(){
+    DPR = Math.max(1, Math.min(2, devicePixelRatio || 1));
+    W = innerWidth; H = innerHeight;
+    canvas.width = Math.floor(W*DPR);
+    canvas.height = Math.floor(H*DPR);
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+  }
+  addEventListener("resize", resize); resize();
 
-      // Anillos orbitales
-      rings: [
-        { radius: 10, count: 10, speed: 0.55, size: 1.1, tilt: 0.18 },
-        { radius: 16, count: 14, speed: 0.35, size: 1.0, tilt: 0.32 },
-        { radius: 23, count: 18, speed: 0.25, size: 0.95, tilt: 0.48 },
-      ],
+  // Helpers
+  const rand = (a,b)=> a + Math.random()*(b-a);
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  function rgba(hex,a){
+    const h=hex.replace("#","");
+    const r=parseInt(h.slice(0,2),16), g=parseInt(h.slice(2,4),16), b=parseInt(h.slice(4,6),16);
+    return `rgba(${r},${g},${b},${a})`;
+  }
 
-      // Mensajes “en el aire”
-      messages: [
-        "te amo mi amor",
-        "mi cielo",
-        "mi vida",
-        "eres mi todo",
-        "mi niña hermosa",
-        "siempre tú",
-        "contigo siempre",
-        "te elijo hoy",
-      ],
-      messageCount: 26,
-      messageRadiusMin: 12,
-      messageRadiusMax: 34,
+  // Stars
+  const stars = Array.from({length: CFG.starCount}, ()=>({
+    x: Math.random()*W,
+    y: Math.random()*H,
+    r: rand(0.2,1.6),
+    a: rand(0.25,0.95),
+    tw: rand(0,10),
+    sp: rand(0.15,0.6),
+  }));
 
-      bloomFake: true,  // brillo simple sin post-procesado (más compatible)
-      animate: true,
+  // Comets (particles with trails)
+  const comets = Array.from({length: CFG.cometCount}, ()=>newComet());
+
+  function newComet(x=W+rand(0,400), y=rand(-200,H+200)){
+    const speed = rand(1.6, 3.8);
+    return {
+      x, y,
+      vx: -speed*rand(0.7,1.1),
+      vy: speed*rand(-0.25,0.25),
+      life: rand(120, 260),
+      max: 0,
+      trail: []
     };
+  }
 
-    // --------- Escena / cámara / renderer ----------
-    const container = document.getElementById("app");
-    const scene = new THREE.Scene();
-
-    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 400);
-    camera.position.set(0, 18, 46);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-    renderer.setSize(innerWidth, innerHeight);
-    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    renderer.setClearColor(0x000000, 1);
-    container.appendChild(renderer.domElement);
-
-    // Controls tipo “orbitar”
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.06;
-    controls.minDistance = 14;
-    controls.maxDistance = 120;
-    controls.target.set(0, 0, 0);
-
-    // Doble tap para reset en móvil
-    let lastTap = 0;
-    renderer.domElement.addEventListener("touchend", () => {
-      const now = Date.now();
-      if (now - lastTap < 280) resetCamera();
-      lastTap = now;
-    }, { passive:true });
-
-    function resetCamera(){
-      camera.position.set(0, 18, 46);
-      controls.target.set(0,0,0);
-      controls.update();
-    }
-
-    // --------- Luces ----------
-    const ambient = new THREE.AmbientLight(0xffffff, 0.40);
-    scene.add(ambient);
-
-    const point = new THREE.PointLight(CONFIG.mainColor, 2.2, 200);
-    point.position.set(0, 0, 0);
-    scene.add(point);
-
-    // Luz de relleno suave
-    const fill = new THREE.DirectionalLight(0xffffff, 0.55);
-    fill.position.set(20, 30, 25);
-    scene.add(fill);
-
-    // --------- Fondo de estrellas ----------
-    function makeStars(count, radius){
-      const geo = new THREE.BufferGeometry();
-      const pos = new Float32Array(count * 3);
-      const col = new Float32Array(count * 3);
-
-      for(let i=0;i<count;i++){
-        // Distribución en esfera
-        const u = Math.random();
-        const v = Math.random();
-        const theta = 2 * Math.PI * u;
-        const phi = Math.acos(2 * v - 1);
-
-        // radio con leve variación
-        const r = radius * (0.75 + 0.25*Math.random());
-
-        const x = r * Math.sin(phi) * Math.cos(theta);
-        const y = r * Math.cos(phi);
-        const z = r * Math.sin(phi) * Math.sin(theta);
-
-        pos[i*3+0] = x;
-        pos[i*3+1] = y;
-        pos[i*3+2] = z;
-
-        const c = 0.7 + 0.3*Math.random();
-        col[i*3+0] = c;
-        col[i*3+1] = c;
-        col[i*3+2] = c;
-      }
-
-      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-      geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
-
-      const mat = new THREE.PointsMaterial({
-        size: 0.28,
-        vertexColors: true,
-        transparent: true,
-        opacity: 0.95,
-        depthWrite: false
-      });
-
-      const stars = new THREE.Points(geo, mat);
-      return stars;
-    }
-    const stars = makeStars(CONFIG.starCount, CONFIG.starRadius);
-    scene.add(stars);
-
-    // Nebulosa suave (esfera grande con material transparente)
-    const nebulaGeo = new THREE.SphereGeometry(95, 32, 32);
-    const nebulaMat = new THREE.MeshBasicMaterial({
-      color: CONFIG.mainColor,
-      transparent: true,
-      opacity: 0.045,
-      side: THREE.BackSide
-    });
-    const nebula = new THREE.Mesh(nebulaGeo, nebulaMat);
-    scene.add(nebula);
-
-    // --------- Forma de corazón (Shape) ----------
-    function heartShape(){
-      const x = 0, y = 0;
-      const s = new THREE.Shape();
-      // Corazón 2D (luego extruimos)
-      s.moveTo(x, y + 1.6);
-      s.bezierCurveTo(x, y + 1.6, x - 2.2, y + 0.8, x - 2.2, y - 0.6);
-      s.bezierCurveTo(x - 2.2, y - 2.2, x - 0.2, y - 2.5, x, y - 1.2);
-      s.bezierCurveTo(x + 0.2, y - 2.5, x + 2.2, y - 2.2, x + 2.2, y - 0.6);
-      s.bezierCurveTo(x + 2.2, y + 0.8, x, y + 1.6, x, y + 1.6);
-      return s;
-    }
-
-    const heartExtrude = {
-      depth: 0.7,
-      bevelEnabled: true,
-      bevelThickness: 0.22,
-      bevelSize: 0.22,
-      bevelSegments: 4,
-      curveSegments: 18,
+  // Floating phrases
+  const floaters = [];
+  function makeFloater(text){
+    return {
+      text,
+      x: rand(0,W),
+      y: rand(0,H),
+      z: rand(0.4, 1.25),     // scale
+      vy: -rand(0.18,0.55),
+      drift: rand(0.08,0.25),
+      a: rand(0.25,0.85)
     };
+  }
+  function refillFloaters(){
+    floaters.length = 0;
+    for(let i=0;i<CFG.floatCount;i++){
+      const list = (i%2===0)?CFG.phrasesA:CFG.phrasesB;
+      floaters.push(makeFloater(list[i % list.length]));
+    }
+  }
+  refillFloaters();
 
-    const heartGeo = new THREE.ExtrudeGeometry(heartShape(), heartExtrude);
-    heartGeo.center();
+  // Interaction: wind + sparkle bursts
+  let windX = 0, windY = 0;
+  let dragging=false, lastX=0,lastY=0;
+  canvas.addEventListener("pointerdown",(e)=>{dragging=true; lastX=e.clientX; lastY=e.clientY; canvas.setPointerCapture(e.pointerId);});
+  canvas.addEventListener("pointermove",(e)=>{
+    if(!dragging) return;
+    const dx=e.clientX-lastX, dy=e.clientY-lastY;
+    lastX=e.clientX; lastY=e.clientY;
+    windX = clamp(windX + dx*0.02, -12, 12);
+    windY = clamp(windY + dy*0.02, -6, 6);
+  });
+  canvas.addEventListener("pointerup",()=>dragging=false);
+  canvas.addEventListener("pointercancel",()=>dragging=false);
 
-    function heartMaterial(color, emissiveStrength=0.55){
-      return new THREE.MeshStandardMaterial({
-        color,
-        roughness: 0.25,
-        metalness: 0.35,
-        emissive: new THREE.Color(color),
-        emissiveIntensity: emissiveStrength
+  const sparks = [];
+  function burst(x,y){
+    for(let i=0;i<30;i++){
+      const a = rand(0,Math.PI*2);
+      const s = rand(1.2, 4.6);
+      sparks.push({
+        x,y,
+        vx: Math.cos(a)*s,
+        vy: Math.sin(a)*s,
+        life: rand(22, 45),
+        c: Math.random()<0.6?CFG.main:"#ffffff"
       });
     }
+  }
+  canvas.addEventListener("click",(e)=>burst(e.clientX,e.clientY));
 
-    // “Sol” corazón central + halo
-    const sun = new THREE.Mesh(heartGeo, heartMaterial(CONFIG.heartColor, 0.85));
-    sun.scale.setScalar(CONFIG.sunSize);
-    scene.add(sun);
-
-    // Halo fake (sprite)
-    const haloTex = makeSoftCircleTexture();
-    const haloMat = new THREE.SpriteMaterial({
-      map: haloTex,
-      color: CONFIG.mainColor,
-      transparent: true,
-      opacity: 0.60,
-      depthWrite: false
-    });
-    const halo = new THREE.Sprite(haloMat);
-    halo.scale.set(22, 22, 1);
-    scene.add(halo);
-
-    function makeSoftCircleTexture(){
-      const c = document.createElement("canvas");
-      c.width = 256; c.height = 256;
-      const g = c.getContext("2d");
-      const grd = g.createRadialGradient(128,128,10,128,128,128);
-      grd.addColorStop(0, "rgba(255,255,255,1)");
-      grd.addColorStop(0.25, "rgba(255,255,255,0.7)");
-      grd.addColorStop(1, "rgba(255,255,255,0)");
-      g.fillStyle = grd;
-      g.fillRect(0,0,256,256);
-      return new THREE.CanvasTexture(c);
+  // Buttons
+  let paused=false;
+  document.getElementById("btnPause").onclick=()=>{
+    paused=!paused;
+    document.getElementById("btnPause").textContent=paused?"Reanudar":"Pausar";
+  };
+  let toggle=false;
+  document.getElementById("btnMore").onclick=()=>{
+    toggle=!toggle;
+    const main=document.getElementById("main");
+    const sub=document.getElementById("sub");
+    if(toggle){
+      main.textContent="Eres mi lugar favorito ✨";
+      sub.textContent="Y mi razón para sonreír.";
+      // recargar con otras frases
+      CFG.phrasesA = ["mi amor","te extraño bonito","me haces feliz","qué lindo es quererte","mi cielo","me encantas","mi vida","eres tú"];
+      CFG.phrasesB = ["siempre contigo","te pienso mucho","mi paz","mi alegría","mi universo","mi suerte","mi corazoncito","mi todo"];
+      refillFloaters();
+    } else {
+      main.textContent="Te amo mi amor 💖";
+      sub.textContent="Mira el cielo… está lleno de “nosotros”.";
+      CFG.phrasesA = ["te amo mi amor","mi cielo","mi vida","eres mi todo","me encantas","mi niña hermosa","contigo siempre","te elijo hoy"];
+      CFG.phrasesB = ["gracias por existir","eres mi paz","mi lugar favorito","quédate","mi corazoncito","mi suerte","te pienso","mi universo"];
+      refillFloaters();
     }
+  };
 
-    // --------- Órbitas (grupos) ----------
-    const ringGroups = [];
-    const orbiters = []; // { mesh, radius, speed, phase, tilt, wobble }
+  // Heart in center (pulse)
+  function drawHeart(cx,cy,s){
+    ctx.beginPath();
+    ctx.moveTo(cx, cy + s*0.30);
+    ctx.bezierCurveTo(cx - s*0.60, cy - s*0.25, cx - s*0.95, cy + s*0.40, cx, cy + s);
+    ctx.bezierCurveTo(cx + s*0.95, cy + s*0.40, cx + s*0.60, cy - s*0.25, cx, cy + s*0.30);
+    ctx.closePath();
+    ctx.fill();
+  }
 
-    CONFIG.rings.forEach((ring, ringIndex) => {
-      const g = new THREE.Group();
-      g.rotation.x = ring.tilt;
-      scene.add(g);
-      ringGroups.push(g);
+  // Loop
+  let t=0;
+  function frame(){
+    requestAnimationFrame(frame);
+    if(!paused) t += 1/60;
 
-      // círculo guía (muy sutil)
-      const circle = makeOrbitCircle(ring.radius, CONFIG.mainColor, 0.10);
-      circle.rotation.x = Math.PI/2;
-      g.add(circle);
+    // Background
+    ctx.fillStyle="#000";
+    ctx.fillRect(0,0,W,H);
 
-      for(let i=0;i<ring.count;i++){
-        const m = new THREE.Mesh(
-          heartGeo,
-          heartMaterial(CONFIG.heartColor, 0.45)
-        );
-        const size = ring.size * (0.85 + 0.35*Math.random());
-        m.scale.setScalar(size);
+    // Soft nebula
+    const g = ctx.createRadialGradient(W*0.55, H*0.55, 20, W*0.55, H*0.55, Math.max(W,H)*0.7);
+    g.addColorStop(0, rgba(CFG.main, 0.10));
+    g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle=g;
+    ctx.fillRect(0,0,W,H);
 
-        // fase inicial
-        const phase = (i / ring.count) * Math.PI * 2 + Math.random()*0.2;
+    // Stars
+    for(const s of stars){
+      const tw = 0.5 + 0.5*Math.sin(t*s.sp + s.tw);
+      ctx.globalAlpha = s.a*(0.65+0.35*tw);
+      ctx.fillStyle="#fff";
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r*(0.7+0.6*tw), 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha=1;
 
-        // ligera inclinación individual
-        m.rotation.z = (Math.random()-0.5)*0.5;
+    // Comets
+    ctx.lineCap="round";
+    for(let i=0;i<comets.length;i++){
+      const c = comets[i];
+      if(!paused){
+        c.max++;
+        c.life--;
+        // wind
+        c.vx += windX*0.002*CFG.windStrength;
+        c.vy += windY*0.002*CFG.windStrength;
 
-        g.add(m);
-        orbiters.push({
-          mesh: m,
-          radius: ring.radius,
-          speed: ring.speed * (0.85 + 0.30*Math.random()),
-          phase,
-          tilt: ring.tilt,
-          wobble: 0.25 + Math.random()*0.55,
-          ringIndex
-        });
+        c.x += c.vx;
+        c.y += c.vy;
+        c.trail.push({x:c.x, y:c.y});
+        if(c.trail.length>CFG.trailLen) c.trail.shift();
       }
-    });
 
-    function makeOrbitCircle(r, color, opacity){
-      const segments = 180;
-      const pts = [];
-      for(let i=0;i<=segments;i++){
-        const a = (i/segments)*Math.PI*2;
-        pts.push(new THREE.Vector3(Math.cos(a)*r, 0, Math.sin(a)*r));
+      // draw trail
+      for(let k=1;k<c.trail.length;k++){
+        const p0=c.trail[k-1], p1=c.trail[k];
+        const a = k/c.trail.length;
+        ctx.strokeStyle = rgba(CFG.main, 0.20*a);
+        ctx.lineWidth = 2.2*a;
+        ctx.beginPath();
+        ctx.moveTo(p0.x,p0.y);
+        ctx.lineTo(p1.x,p1.y);
+        ctx.stroke();
       }
-      const geo = new THREE.BufferGeometry().setFromPoints(pts);
-      const mat = new THREE.LineBasicMaterial({ color, transparent:true, opacity });
-      return new THREE.Line(geo, mat);
+      // head
+      ctx.fillStyle = rgba("#ffffff", 0.9);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, 1.8, 0, Math.PI*2);
+      ctx.fill();
+
+      if(c.life<=0 || c.x<-500 || c.y<-500 || c.y>H+500){
+        comets[i]=newComet();
+      }
     }
 
-    // --------- Mensajes flotando (sprites con canvas) ----------
-    const messageSprites = [];
-    for(let i=0;i<CONFIG.messageCount;i++){
-      const text = CONFIG.messages[i % CONFIG.messages.length];
-      const spr = makeTextSprite(text, CONFIG.messageColor);
-      const r = lerp(CONFIG.messageRadiusMin, CONFIG.messageRadiusMax, Math.random());
-      const a = Math.random()*Math.PI*2;
-      const h = (Math.random()-0.5) * 18;
+    // Center heart + glow
+    const beat = 1 + 0.06*Math.sin(t*2.1) + 0.03*Math.sin(t*4.2);
+    const s = Math.min(W,H)*0.08*beat;
+    // glow
+    const gg = ctx.createRadialGradient(W/2,H/2, 0, W/2,H/2, s*5);
+    gg.addColorStop(0, rgba(CFG.main, 0.25));
+    gg.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle=gg;
+    ctx.fillRect(0,0,W,H);
 
-      spr.position.set(Math.cos(a)*r, h, Math.sin(a)*r);
-      spr.scale.multiplyScalar(0.9 + Math.random()*0.7);
+    ctx.fillStyle = CFG.main;
+    ctx.shadowColor = rgba(CFG.main, 0.55);
+    ctx.shadowBlur = 24;
+    drawHeart(W/2, H/2 - s*0.15, s);
+    ctx.shadowBlur = 0;
 
-      // guardamos algo de animación
-      spr.userData = {
-        baseR: r,
-        baseA: a,
-        baseY: h,
-        drift: 0.2 + Math.random()*0.6,
-        spin: (Math.random()<0.5?-1:1)*(0.08+Math.random()*0.22),
-      };
+    // Floating phrases (depth-ish)
+    for(const f of floaters){
+      if(!paused){
+        f.y += f.vy;
+        f.x += (Math.sin(t*f.drift) + windX*0.02) * 0.25;
+        if(f.y < -60) { f.y = H + 60; f.x = rand(0,W); }
+        if(f.x < -120) f.x = W+120;
+        if(f.x > W+120) f.x = -120;
+      }
+      const scale = f.z;
+      ctx.font = `${Math.round(14*scale)}px system-ui,-apple-system,Segoe UI,Roboto,Arial`;
+      ctx.textAlign="center";
+      ctx.textBaseline="middle";
+      ctx.globalAlpha = f.a;
 
-      scene.add(spr);
-      messageSprites.push(spr);
-    }
-
-    function makeTextSprite(text, color){
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
-
-      // Medimos para tamaño “bonito”
-      const fontSize = 54;
-      ctx.font = `700 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-      const padding = 30;
-      const metrics = ctx.measureText(text);
-      const w = Math.ceil(metrics.width + padding*2);
-      const h = Math.ceil(fontSize + padding*1.6);
-
-      canvas.width = w;
-      canvas.height = h;
-
-      // Fondo transparente con glow
-      ctx.clearRect(0,0,w,h);
-      ctx.font = `700 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-
-      // glow
-      ctx.shadowColor = "rgba(255,255,255,0.65)";
-      ctx.shadowBlur = 18;
-      ctx.fillStyle = "rgba(0,0,0,0.0)";
-      ctx.fillRect(0,0,w,h);
-
-      // texto
-      ctx.shadowColor = "rgba(0,0,0,0.35)";
-      ctx.shadowBlur = 10;
-      ctx.fillStyle = "#ffffff";
-      ctx.fillText(text, w/2, h/2);
-
-      // borde suave color principal (sutil)
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = "rgba(255,77,141,0.55)";
+      // outline + fill
       ctx.lineWidth = 3;
-      ctx.strokeText(text, w/2, h/2);
+      ctx.strokeStyle = rgba(CFG.main, 0.55);
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.shadowColor = "rgba(255,255,255,0.28)";
+      ctx.shadowBlur = 10;
+      ctx.strokeText(f.text, f.x, f.y);
+      ctx.shadowBlur = 0;
+      ctx.fillText(f.text, f.x, f.y);
 
-      const tex = new THREE.CanvasTexture(canvas);
-      tex.minFilter = THREE.LinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-
-      const mat = new THREE.SpriteMaterial({
-        map: tex,
-        transparent: true,
-        opacity: 0.92,
-        depthWrite: false
-      });
-
-      const spr = new THREE.Sprite(mat);
-
-      // escala proporcional
-      const scale = 0.03; // controla tamaño general
-      spr.scale.set(w*scale, h*scale, 1);
-      return spr;
+      ctx.globalAlpha=1;
     }
 
-    function lerp(a,b,t){ return a + (b-a)*t; }
-
-    // --------- UI de pausa / reset ----------
-    const btnPause = document.getElementById("btnPause");
-    const btnReset = document.getElementById("btnReset");
-    btnReset.onclick = resetCamera;
-
-    btnPause.onclick = () => {
-      CONFIG.animate = !CONFIG.animate;
-      btnPause.textContent = CONFIG.animate ? "Pausar" : "Reanudar";
-    };
-
-    // --------- Animación ----------
-    const clock = new THREE.Clock();
-    let time = 0;
-
-    function animate(){
-      requestAnimationFrame(animate);
-      const dt = Math.min(0.033, clock.getDelta());
-      if(CONFIG.animate) time += dt;
-
-      // Estrellas: rotación lenta
-      stars.rotation.y = time * 0.02;
-      stars.rotation.x = time * 0.005;
-
-      // Nebulosa: respiración
-      nebula.material.opacity = 0.035 + 0.02*Math.sin(time*0.35);
-
-      // Sol: rotación y “latido”
-      sun.rotation.y = time * 0.35;
-      sun.rotation.x = time * 0.12;
-      const beat = 1.0 + 0.03*Math.sin(time*2.2) + 0.015*Math.sin(time*4.4);
-      sun.scale.setScalar(CONFIG.sunSize * beat);
-      halo.material.opacity = 0.45 + 0.18*Math.sin(time*1.1);
-
-      // Órbitas
-      for(const o of orbiters){
-        const a = o.phase + time * o.speed;
-        const wob = 1 + 0.03*Math.sin(time*2.0 + o.wobble*10);
-        const x = Math.cos(a) * o.radius * wob;
-        const z = Math.sin(a) * o.radius * wob;
-
-        o.mesh.position.set(x, 0, z);
-        o.mesh.lookAt(0,0,0);
-        o.mesh.rotation.z += 0.003; // brillo/vida
+    // Sparks
+    for(let i=sparks.length-1;i>=0;i--){
+      const p = sparks[i];
+      if(!paused){
+        p.life -= 1;
+        p.vx *= 0.97;
+        p.vy *= 0.97;
+        p.vy += 0.06; // gravity
+        p.x += p.vx;
+        p.y += p.vy;
       }
-
-      // Mensajes flotando: se mueven suave y siempre miran a la cámara
-      for(const s of messageSprites){
-        const u = s.userData;
-        const a = u.baseA + time * u.spin;
-        const r = u.baseR * (1 + 0.025*Math.sin(time*1.6 + u.drift*12));
-        const y = u.baseY + 0.8*Math.sin(time*1.2 + u.drift*8);
-
-        s.position.set(Math.cos(a)*r, y, Math.sin(a)*r);
-        // “billboard” (sprite ya mira a cámara), pero ajustamos opacidad por distancia
-        const d = camera.position.distanceTo(s.position);
-        s.material.opacity = THREE.MathUtils.clamp(1.15 - d/85, 0.18, 0.95);
-      }
-
-      controls.update();
-      renderer.render(scene, camera);
+      const a = clamp(p.life/45, 0, 1);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = rgba(p.c, 0.85*a);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.0*a, 0, Math.PI*2);
+      ctx.fill();
+      if(p.life<=0) sparks.splice(i,1);
     }
-    animate();
+    ctx.globalAlpha=1;
 
-    // --------- Resize ----------
-    addEventListener("resize", () => {
-      camera.aspect = innerWidth/innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(innerWidth, innerHeight);
-      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-    });
-
-  </script>
+    // Slowly relax wind
+    windX *= 0.985;
+    windY *= 0.985;
+  }
+  frame();
+})();
+</script>
 </body>
 </html>
