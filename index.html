@@ -1,0 +1,488 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Sistema Solar de Corazones</title>
+  <style>
+    html, body { height:100%; margin:0; background:#000; overflow:hidden; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    #app { position:fixed; inset:0; }
+    .ui {
+      position:fixed; left:12px; top:12px; right:12px;
+      display:flex; justify-content:space-between; gap:10px;
+      pointer-events:none;
+    }
+    .pill{
+      pointer-events:auto;
+      background: rgba(0,0,0,.45);
+      border:1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(10px);
+      color:#fff; padding:10px 12px;
+      border-radius:999px;
+      display:flex; align-items:center; gap:10px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.35);
+      font-size:13px;
+    }
+    .pill strong{font-weight:800}
+    button{
+      appearance:none; border:0; cursor:pointer;
+      background: rgba(255,255,255,.10);
+      color:#fff; padding:10px 12px; border-radius:12px;
+    }
+    button:hover{background: rgba(255,255,255,.16);}
+    .hint{
+      position:fixed; left:50%; bottom:14px; transform:translateX(-50%);
+      color:rgba(255,255,255,.72);
+      font-size:12px;
+      padding:8px 10px;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:999px;
+      backdrop-filter: blur(10px);
+      pointer-events:none;
+      text-align:center;
+      max-width: min(520px, calc(100% - 28px));
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div class="ui">
+    <div class="pill"><strong id="title">Te amo mi amor</strong> <span style="opacity:.75" id="sub">— sistema solar 💫</span></div>
+    <div class="pill">
+      <button id="btnPause">Pausar</button>
+      <button id="btnReset">Reset cámara</button>
+    </div>
+  </div>
+
+  <div class="hint">Arrastra para girar • Pellizca para zoom • Doble toque para reset (en móvil)</div>
+
+  <!-- Three.js desde CDN -->
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+    import { OrbitControls } from "https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+
+    // --------- Ajustes rápidos ----------
+    const CONFIG = {
+      mainColor: 0xff4d8d,
+      heartColor: 0xff4d8d,
+      messageColor: 0xffffff,
+
+      starCount: 2500,
+      starRadius: 140,
+
+      // “Sol”
+      sunSize: 3.2,
+
+      // Anillos orbitales
+      rings: [
+        { radius: 10, count: 10, speed: 0.55, size: 1.1, tilt: 0.18 },
+        { radius: 16, count: 14, speed: 0.35, size: 1.0, tilt: 0.32 },
+        { radius: 23, count: 18, speed: 0.25, size: 0.95, tilt: 0.48 },
+      ],
+
+      // Mensajes “en el aire”
+      messages: [
+        "te amo mi amor",
+        "mi cielo",
+        "mi vida",
+        "eres mi todo",
+        "mi niña hermosa",
+        "siempre tú",
+        "contigo siempre",
+        "te elijo hoy",
+      ],
+      messageCount: 26,
+      messageRadiusMin: 12,
+      messageRadiusMax: 34,
+
+      bloomFake: true,  // brillo simple sin post-procesado (más compatible)
+      animate: true,
+    };
+
+    // --------- Escena / cámara / renderer ----------
+    const container = document.getElementById("app");
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 400);
+    camera.position.set(0, 18, 46);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setClearColor(0x000000, 1);
+    container.appendChild(renderer.domElement);
+
+    // Controls tipo “orbitar”
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 14;
+    controls.maxDistance = 120;
+    controls.target.set(0, 0, 0);
+
+    // Doble tap para reset en móvil
+    let lastTap = 0;
+    renderer.domElement.addEventListener("touchend", () => {
+      const now = Date.now();
+      if (now - lastTap < 280) resetCamera();
+      lastTap = now;
+    }, { passive:true });
+
+    function resetCamera(){
+      camera.position.set(0, 18, 46);
+      controls.target.set(0,0,0);
+      controls.update();
+    }
+
+    // --------- Luces ----------
+    const ambient = new THREE.AmbientLight(0xffffff, 0.40);
+    scene.add(ambient);
+
+    const point = new THREE.PointLight(CONFIG.mainColor, 2.2, 200);
+    point.position.set(0, 0, 0);
+    scene.add(point);
+
+    // Luz de relleno suave
+    const fill = new THREE.DirectionalLight(0xffffff, 0.55);
+    fill.position.set(20, 30, 25);
+    scene.add(fill);
+
+    // --------- Fondo de estrellas ----------
+    function makeStars(count, radius){
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(count * 3);
+      const col = new Float32Array(count * 3);
+
+      for(let i=0;i<count;i++){
+        // Distribución en esfera
+        const u = Math.random();
+        const v = Math.random();
+        const theta = 2 * Math.PI * u;
+        const phi = Math.acos(2 * v - 1);
+
+        // radio con leve variación
+        const r = radius * (0.75 + 0.25*Math.random());
+
+        const x = r * Math.sin(phi) * Math.cos(theta);
+        const y = r * Math.cos(phi);
+        const z = r * Math.sin(phi) * Math.sin(theta);
+
+        pos[i*3+0] = x;
+        pos[i*3+1] = y;
+        pos[i*3+2] = z;
+
+        const c = 0.7 + 0.3*Math.random();
+        col[i*3+0] = c;
+        col[i*3+1] = c;
+        col[i*3+2] = c;
+      }
+
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+
+      const mat = new THREE.PointsMaterial({
+        size: 0.28,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.95,
+        depthWrite: false
+      });
+
+      const stars = new THREE.Points(geo, mat);
+      return stars;
+    }
+    const stars = makeStars(CONFIG.starCount, CONFIG.starRadius);
+    scene.add(stars);
+
+    // Nebulosa suave (esfera grande con material transparente)
+    const nebulaGeo = new THREE.SphereGeometry(95, 32, 32);
+    const nebulaMat = new THREE.MeshBasicMaterial({
+      color: CONFIG.mainColor,
+      transparent: true,
+      opacity: 0.045,
+      side: THREE.BackSide
+    });
+    const nebula = new THREE.Mesh(nebulaGeo, nebulaMat);
+    scene.add(nebula);
+
+    // --------- Forma de corazón (Shape) ----------
+    function heartShape(){
+      const x = 0, y = 0;
+      const s = new THREE.Shape();
+      // Corazón 2D (luego extruimos)
+      s.moveTo(x, y + 1.6);
+      s.bezierCurveTo(x, y + 1.6, x - 2.2, y + 0.8, x - 2.2, y - 0.6);
+      s.bezierCurveTo(x - 2.2, y - 2.2, x - 0.2, y - 2.5, x, y - 1.2);
+      s.bezierCurveTo(x + 0.2, y - 2.5, x + 2.2, y - 2.2, x + 2.2, y - 0.6);
+      s.bezierCurveTo(x + 2.2, y + 0.8, x, y + 1.6, x, y + 1.6);
+      return s;
+    }
+
+    const heartExtrude = {
+      depth: 0.7,
+      bevelEnabled: true,
+      bevelThickness: 0.22,
+      bevelSize: 0.22,
+      bevelSegments: 4,
+      curveSegments: 18,
+    };
+
+    const heartGeo = new THREE.ExtrudeGeometry(heartShape(), heartExtrude);
+    heartGeo.center();
+
+    function heartMaterial(color, emissiveStrength=0.55){
+      return new THREE.MeshStandardMaterial({
+        color,
+        roughness: 0.25,
+        metalness: 0.35,
+        emissive: new THREE.Color(color),
+        emissiveIntensity: emissiveStrength
+      });
+    }
+
+    // “Sol” corazón central + halo
+    const sun = new THREE.Mesh(heartGeo, heartMaterial(CONFIG.heartColor, 0.85));
+    sun.scale.setScalar(CONFIG.sunSize);
+    scene.add(sun);
+
+    // Halo fake (sprite)
+    const haloTex = makeSoftCircleTexture();
+    const haloMat = new THREE.SpriteMaterial({
+      map: haloTex,
+      color: CONFIG.mainColor,
+      transparent: true,
+      opacity: 0.60,
+      depthWrite: false
+    });
+    const halo = new THREE.Sprite(haloMat);
+    halo.scale.set(22, 22, 1);
+    scene.add(halo);
+
+    function makeSoftCircleTexture(){
+      const c = document.createElement("canvas");
+      c.width = 256; c.height = 256;
+      const g = c.getContext("2d");
+      const grd = g.createRadialGradient(128,128,10,128,128,128);
+      grd.addColorStop(0, "rgba(255,255,255,1)");
+      grd.addColorStop(0.25, "rgba(255,255,255,0.7)");
+      grd.addColorStop(1, "rgba(255,255,255,0)");
+      g.fillStyle = grd;
+      g.fillRect(0,0,256,256);
+      return new THREE.CanvasTexture(c);
+    }
+
+    // --------- Órbitas (grupos) ----------
+    const ringGroups = [];
+    const orbiters = []; // { mesh, radius, speed, phase, tilt, wobble }
+
+    CONFIG.rings.forEach((ring, ringIndex) => {
+      const g = new THREE.Group();
+      g.rotation.x = ring.tilt;
+      scene.add(g);
+      ringGroups.push(g);
+
+      // círculo guía (muy sutil)
+      const circle = makeOrbitCircle(ring.radius, CONFIG.mainColor, 0.10);
+      circle.rotation.x = Math.PI/2;
+      g.add(circle);
+
+      for(let i=0;i<ring.count;i++){
+        const m = new THREE.Mesh(
+          heartGeo,
+          heartMaterial(CONFIG.heartColor, 0.45)
+        );
+        const size = ring.size * (0.85 + 0.35*Math.random());
+        m.scale.setScalar(size);
+
+        // fase inicial
+        const phase = (i / ring.count) * Math.PI * 2 + Math.random()*0.2;
+
+        // ligera inclinación individual
+        m.rotation.z = (Math.random()-0.5)*0.5;
+
+        g.add(m);
+        orbiters.push({
+          mesh: m,
+          radius: ring.radius,
+          speed: ring.speed * (0.85 + 0.30*Math.random()),
+          phase,
+          tilt: ring.tilt,
+          wobble: 0.25 + Math.random()*0.55,
+          ringIndex
+        });
+      }
+    });
+
+    function makeOrbitCircle(r, color, opacity){
+      const segments = 180;
+      const pts = [];
+      for(let i=0;i<=segments;i++){
+        const a = (i/segments)*Math.PI*2;
+        pts.push(new THREE.Vector3(Math.cos(a)*r, 0, Math.sin(a)*r));
+      }
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      const mat = new THREE.LineBasicMaterial({ color, transparent:true, opacity });
+      return new THREE.Line(geo, mat);
+    }
+
+    // --------- Mensajes flotando (sprites con canvas) ----------
+    const messageSprites = [];
+    for(let i=0;i<CONFIG.messageCount;i++){
+      const text = CONFIG.messages[i % CONFIG.messages.length];
+      const spr = makeTextSprite(text, CONFIG.messageColor);
+      const r = lerp(CONFIG.messageRadiusMin, CONFIG.messageRadiusMax, Math.random());
+      const a = Math.random()*Math.PI*2;
+      const h = (Math.random()-0.5) * 18;
+
+      spr.position.set(Math.cos(a)*r, h, Math.sin(a)*r);
+      spr.scale.multiplyScalar(0.9 + Math.random()*0.7);
+
+      // guardamos algo de animación
+      spr.userData = {
+        baseR: r,
+        baseA: a,
+        baseY: h,
+        drift: 0.2 + Math.random()*0.6,
+        spin: (Math.random()<0.5?-1:1)*(0.08+Math.random()*0.22),
+      };
+
+      scene.add(spr);
+      messageSprites.push(spr);
+    }
+
+    function makeTextSprite(text, color){
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // Medimos para tamaño “bonito”
+      const fontSize = 54;
+      ctx.font = `700 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      const padding = 30;
+      const metrics = ctx.measureText(text);
+      const w = Math.ceil(metrics.width + padding*2);
+      const h = Math.ceil(fontSize + padding*1.6);
+
+      canvas.width = w;
+      canvas.height = h;
+
+      // Fondo transparente con glow
+      ctx.clearRect(0,0,w,h);
+      ctx.font = `700 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+
+      // glow
+      ctx.shadowColor = "rgba(255,255,255,0.65)";
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = "rgba(0,0,0,0.0)";
+      ctx.fillRect(0,0,w,h);
+
+      // texto
+      ctx.shadowColor = "rgba(0,0,0,0.35)";
+      ctx.shadowBlur = 10;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, w/2, h/2);
+
+      // borde suave color principal (sutil)
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = "rgba(255,77,141,0.55)";
+      ctx.lineWidth = 3;
+      ctx.strokeText(text, w/2, h/2);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.minFilter = THREE.LinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0.92,
+        depthWrite: false
+      });
+
+      const spr = new THREE.Sprite(mat);
+
+      // escala proporcional
+      const scale = 0.03; // controla tamaño general
+      spr.scale.set(w*scale, h*scale, 1);
+      return spr;
+    }
+
+    function lerp(a,b,t){ return a + (b-a)*t; }
+
+    // --------- UI de pausa / reset ----------
+    const btnPause = document.getElementById("btnPause");
+    const btnReset = document.getElementById("btnReset");
+    btnReset.onclick = resetCamera;
+
+    btnPause.onclick = () => {
+      CONFIG.animate = !CONFIG.animate;
+      btnPause.textContent = CONFIG.animate ? "Pausar" : "Reanudar";
+    };
+
+    // --------- Animación ----------
+    const clock = new THREE.Clock();
+    let time = 0;
+
+    function animate(){
+      requestAnimationFrame(animate);
+      const dt = Math.min(0.033, clock.getDelta());
+      if(CONFIG.animate) time += dt;
+
+      // Estrellas: rotación lenta
+      stars.rotation.y = time * 0.02;
+      stars.rotation.x = time * 0.005;
+
+      // Nebulosa: respiración
+      nebula.material.opacity = 0.035 + 0.02*Math.sin(time*0.35);
+
+      // Sol: rotación y “latido”
+      sun.rotation.y = time * 0.35;
+      sun.rotation.x = time * 0.12;
+      const beat = 1.0 + 0.03*Math.sin(time*2.2) + 0.015*Math.sin(time*4.4);
+      sun.scale.setScalar(CONFIG.sunSize * beat);
+      halo.material.opacity = 0.45 + 0.18*Math.sin(time*1.1);
+
+      // Órbitas
+      for(const o of orbiters){
+        const a = o.phase + time * o.speed;
+        const wob = 1 + 0.03*Math.sin(time*2.0 + o.wobble*10);
+        const x = Math.cos(a) * o.radius * wob;
+        const z = Math.sin(a) * o.radius * wob;
+
+        o.mesh.position.set(x, 0, z);
+        o.mesh.lookAt(0,0,0);
+        o.mesh.rotation.z += 0.003; // brillo/vida
+      }
+
+      // Mensajes flotando: se mueven suave y siempre miran a la cámara
+      for(const s of messageSprites){
+        const u = s.userData;
+        const a = u.baseA + time * u.spin;
+        const r = u.baseR * (1 + 0.025*Math.sin(time*1.6 + u.drift*12));
+        const y = u.baseY + 0.8*Math.sin(time*1.2 + u.drift*8);
+
+        s.position.set(Math.cos(a)*r, y, Math.sin(a)*r);
+        // “billboard” (sprite ya mira a cámara), pero ajustamos opacidad por distancia
+        const d = camera.position.distanceTo(s.position);
+        s.material.opacity = THREE.MathUtils.clamp(1.15 - d/85, 0.18, 0.95);
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    // --------- Resize ----------
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth/innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    });
+
+  </script>
+</body>
+</html>
